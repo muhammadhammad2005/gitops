@@ -17,3 +17,11 @@ spec:
         image: nginx:1.22
         ports:
         - containerPort: 80
+        volumeMounts:
+        - name: web
+          mountPath: /usr/share/nginx/html/index.html
+          subPath: index.html
+      volumes:
+      - name: web
+        configMap:
+          name: web-content
