@@ -1,0 +1,119 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: optimized-app
+  namespace: default
+  labels:
+    app: optimized-app
+    version: v1.0.0
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: optimized-app
+  template:
+    metadata:
+      labels:
+        app: optimized-app
+        version: v1.0.0
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.21-alpine
+        ports:
+        - containerPort: 80
+          name: http
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "100m"
+          limits:
+            memory: "64Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1
+        startupProbe:
+          httpGet:
+            path: /
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 10
+          successThreshold: 1
+        env:
+        - name: NGINX_PORT
+          value: "80"
+        volumeMounts:
+        - name: config
+          mountPath: /etc/nginx/conf.d
+      volumes:
+      - name: config
+        configMap:
+          name: optimized-app-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: optimized-app-config
+  namespace: default
+data:
+  default.conf: |
+    server {
+        listen 80;
+        server_name localhost;
+
+        location / {
+            return 200 'Optimized App is Healthy!';
+            add_header Content-Type text/plain;
+        }
+
+        location /health {
+            access_log off;
+            return 200 'OK';
+            add_header Content-Type text/plain;
+        }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: optimized-app-service
+  namespace: default
+  labels:
+    app: optimized-app
+spec:
+  selector:
+    app: optimized-app
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: http
+  type: ClusterIP

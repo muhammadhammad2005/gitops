@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+data:
+  resource.customizations.health.apps_Deployment: |
+    hs = {}
+    if obj.status ~= nil then
+      if obj.status.replicas ~= nil and obj.status.readyReplicas ~= nil then
+        if obj.status.replicas == obj.status.readyReplicas then
+          hs.status = "Healthy"
+          hs.message = "All replicas are ready"
+        else
+          hs.status = "Progressing"
+          hs.message = "Waiting for replicas to be ready"
+        end
+      else
+        hs.status = "Progressing"
+        hs.message = "Deployment is starting"
+      end
+    else
+      hs.status = "Progressing"
+      hs.message = "Deployment status unknown"
+    end
+    return hs
+  resource.customizations.health.v1_Service: |
+    hs = {}
+    if obj.spec.type == "LoadBalancer" then
+      if obj.status.loadBalancer.ingress ~= nil and #obj.status.loadBalancer.ingress > 0 then
+        hs.status = "Healthy"
+        hs.message = "LoadBalancer has assigned IP"
+      else
+        hs.status = "Progressing"
+        hs.message = "Waiting for LoadBalancer IP assignment"
+      end
+    else
+      hs.status = "Healthy"
+      hs.message = "Service is ready"
+    end
+    return hs
+  timeout.hard.reconciliation: "0"
+  timeout.reconciliation: 180s
